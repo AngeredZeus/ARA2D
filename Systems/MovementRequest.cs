@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Nez;
 using System;
 using ARA2D.Components;
+using ARA2D.TileEntities;
 
 namespace ARA2D.Systems
 {
@@ -11,9 +12,9 @@ namespace ARA2D.Systems
     {
         readonly MovementRequest movementRequest;
         readonly TileEntitySystem tileEntitySystem;
+        private int tempCount = 0; 
 
-
-        private Dictionary<int, Vector2> MovementRequests;
+        private Dictionary<Entity, Vector2> MovementRequests;
 
         public override void process(Entity entity)
         {
@@ -21,39 +22,56 @@ namespace ARA2D.Systems
             //Phase 1: 
             //Collect the movement requests.
 
-            //TODO: Probably a better way to clean this up
-            if(entity.getComponent<Movable>().getMove() == Movable.MoveSet.NULL)
-            {
-                return;
-            }else if (entity.getComponent<Movable>().getMove() == Movable.MoveSet.NORTH)
-            {
-                
-                //Store the wanted position, and ID
-                MovementRequests.Add(entity.id, new Vector2(entity.position.X, entity.position.Y + 1));
 
-            }
-            else if (entity.getComponent<Movable>().getMove() == Movable.MoveSet.EAST)
-            {
-                MovementRequests.Add(entity, new Vector2(entity.position.X + 1, entity.position.Y));
+            var move = entity.getComponent<Movable>().CurrentMove;
+            var Worldpos = TileCoords.ToWorldSpace(entity.localPosition.X, entity.localPosition.Y);
 
-            }
-            else if (entity.getComponent<Movable>().getMove() == Movable.MoveSet.SOUTH)
+            switch (move)
             {
-                MovementRequests.Add(entity.id, new Vector2(entity.position.X, entity.position.Y - 1));
-
+                case Movable.MoveSet.NULL:
+                    break;
+                case Movable.MoveSet.NORTH:
+                    MovementRequests.Add(entity, new Vector2(Worldpos.X, Worldpos.Y + 1.0f));
+                    break;
+                case Movable.MoveSet.EAST:
+                    MovementRequests.Add(entity, new Vector2(Worldpos.X + 1.0f, Worldpos.Y));
+                    break;
+                case Movable.MoveSet.SOUTH:
+                    MovementRequests.Add(entity, new Vector2(Worldpos.X, Worldpos.Y - 1.0f));
+                    break;
+                case Movable.MoveSet.WEST:
+                    MovementRequests.Add(entity, new Vector2(Worldpos.X - 1.0f, Worldpos.Y));
+                    break;
+                default:
+                    break;
             }
-            else if (entity.getComponent<Movable>().getMove() == Movable.MoveSet.WEST)
+            tempCount++;
+
+
+            if(tempCount == 20)
             {
-                MovementRequests.Add(entity.id, new Vector2(entity.position.X - 1, entity.position.Y));
-
+                EvaluateMovementRequests();
+                tempCount = 0;
             }
+
             //This should work so far..
 
+            
+
+        }
+        public MovementRequest(MovementRequest movementRequest, TileEntitySystem tileEntitySystem) : base(new Matcher().all(typeof(Movable)))
+        {
+            this.movementRequest = movementRequest;
+            this.tileEntitySystem = tileEntitySystem;
+        }
+
+        public void EvaluateMovementRequests()
+        {
 
             //Phase 2: 
             //Process the movement requests.
 
-            //TODO: Use LINQ (?) or make this loop better somehow
+            //TODO: Optimize This
             //Removes duplicates
             foreach (var mv1 in MovementRequests)
             {
@@ -66,21 +84,13 @@ namespace ARA2D.Systems
                     }
                 }
             }
-            
-            //Process requests by changing the entities position.
-            foreach (var mv1 in MovementRequests)
+            foreach (var moveRequest in MovementRequests)
             {
-                if (tileEntitySystem.CanPlaceTileEntity(entity, mv1.Value.X, mv1.Value.Y))
-                {
-
-                }
+                moveRequest.Key.setPosition(TileCoords.FromWorldSpace(moveRequest.Value.X, moveRequest.Value.Y));
+                moveRequest.Key.getComponent<Movable>().CurrentMove = Movable.MoveSet.NULL;
+                MovementRequests.Remove(moveRequest.Key);
             }
 
-        }
-        public MovementRequest(MovementRequest movementRequest, TileEntitySystem tileEntitySystem) : base(new Matcher().all(typeof(Movable)))
-        {
-            this.movementRequest = movementRequest;
-            this.tileEntitySystem = tileEntitySystem;
         }
     }
 }
